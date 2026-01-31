@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Env & secrets
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model & data (tùy chọn: bỏ comment nếu không muốn đẩy lên git)
+fare_model.joblib
+*.joblib
+# data/urban_mobility_trips.csv
+
+
+# Jupyter
+.ipynb_checkpoints/
