@@ -16,11 +16,14 @@ from ml_inference import load_model, load_model_from_file, predict_fare
 st.set_page_config("Urban Mobility Analytics", layout="wide")
 st.title("Urban Mobility Analytics")
 
-ping()
-st.success("MongoDB connected")
+try:
+    ping()
+    st.success("MongoDB connected")
+except Exception as e:
+    st.warning("MongoDB chưa kết nối được. Tab Analytics cần DB; Fare Prediction (từ file) vẫn dùng được.")
 
-# Giảm số dòng mặc định → load nhanh hơn (có thể tăng trong sidebar)
-DEFAULT_DATA_LIMIT = 100_000
+# Mặc định 1000 dòng cho Analytics (server 1GB RAM); có thể tăng trong sidebar
+DEFAULT_DATA_LIMIT = 1_000
 
 
 @st.cache_data(ttl=300)
@@ -55,7 +58,7 @@ def get_model():
     return load_model(model_col)
 
 
-# Lazy: mặc định Fare Prediction → mở app nhanh; chỉ load 100k dòng khi chọn Analytics
+# Lazy: mặc định Fare Prediction → mở app nhanh; Analytics mặc định 1000 dòng
 page = st.radio(
     "Chọn trang",
     ["Fare Prediction", "Analytics Dashboard"],
@@ -68,14 +71,18 @@ st.divider()
 if page == "Analytics Dashboard":
     limit = st.sidebar.number_input(
         "Số dòng tối đa từ DB",
-        min_value=10_000,
-        max_value=500_000,
+        min_value=500,
+        max_value=10000,
         value=DEFAULT_DATA_LIMIT,
-        step=50_000,
-        help="Giảm để load nhanh hơn.",
+        step=500,
+        help="Mặc định 1000 dòng (nhẹ cho server). Có thể tăng nếu RAM đủ.",
     )
-    with st.spinner("Đang tải dữ liệu và tính toán..."):
-        charts = get_analytics_results(limit)
+    try:
+        with st.spinner("Đang tải dữ liệu và tính toán...s"):
+            charts = get_analytics_results(limit)
+    except Exception as e:
+        st.error("Không tải được dữ liệu từ MongoDB. Kiểm tra kết nối và .env.")
+        st.stop()
     st.subheader("Trips by zone")
     st.bar_chart(charts["trips_zone"])
     st.subheader("Revenue by zone")

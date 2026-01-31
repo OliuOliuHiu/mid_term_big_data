@@ -1,6 +1,8 @@
 """
 Train RandomForest dự đoán fare. Có thể lưu ra file (.joblib) và/hoặc MongoDB.
 Chạy: python ml_train.py [--output file.joblib] [--limit N] [--sample N]
+  --light     : train nhẹ 1000 dòng, 50 cây, chỉ ghi file (dùng cho deploy server)
+  --ultra-light : rất nhẹ 500 dòng, 20 cây, file nhỏ (server 1GB RAM)
   --output    : đường dẫn file lưu model (app ưu tiên load từ file nếu có)
   --limit N   : max dòng từ MongoDB (mặc định 100000)
   --no-mongo  : không lưu vào MongoDB, chỉ ghi file
@@ -35,6 +37,8 @@ PROJECTION = {"_id": 0, **{f: 1 for f in FEATURES}, **{TARGET: 1}}
 
 def main():
     parser = argparse.ArgumentParser(description="Train fare regression model, save to MongoDB")
+    parser.add_argument("--light", action="store_true", help="Train nhẹ: 1000 dòng, 50 cây, chỉ ghi file (cho deploy server)")
+    parser.add_argument("--ultra-light", action="store_true", help="Rất nhẹ: 500 dòng, 20 cây, file nhỏ (server 1GB RAM)")
     parser.add_argument("--output", "-o", type=str, default="fare_model.joblib", help="Path to save model file (default: fare_model.joblib)")
     parser.add_argument("--no-mongo", action="store_true", help="Only save to file, do not save to MongoDB")
     parser.add_argument("--limit", type=int, default=100_000, help="Max documents from MongoDB (0 = no limit)")
@@ -42,6 +46,17 @@ def main():
     parser.add_argument("--test-size", type=float, default=0.2, help="Test split ratio")
     parser.add_argument("--n-estimators", type=int, default=300, help="RandomForest n_estimators")
     args = parser.parse_args()
+
+    if args.light:
+        args.limit = 1000
+        args.n_estimators = 50
+        args.no_mongo = True
+        print("Chế độ --light: limit=1000, n_estimators=50, chỉ ghi file (không ghi MongoDB).")
+    if args.ultra_light:
+        args.limit = 500
+        args.n_estimators = 20
+        args.no_mongo = True
+        print("Chế độ --ultra-light: limit=500, n_estimators=20, file rất nhỏ (server 1GB RAM).")
 
     print("Đang kết nối MongoDB...")
     client = MongoClient(os.getenv("MONGO_URI"))
@@ -83,13 +98,19 @@ def main():
     r2 = r2_score(y_test, pred)
     metrics = {"rmse": rmse, "r2": r2}
 
-    # Lưu ra file (app sẽ ưu tiên load từ file nếu tồn tại)
-    print(f"Đang ghi file {args.output}...")
+    # Lưu ra file có nén → file nhỏ hơn (phù hợp server 1GB RAM)
+    print(f"Đang ghi file {args.output} (có nén)...")
     joblib.dump(
         {"model": model, "features": FEATURES, "metrics": metrics},
         args.output,
+        compress=3,
     )
-    print(f"Đã lưu model vào file: {args.output}")
+    size_mb = os.path.getsize(args.output) / (1024 * 1024)
+    size_kb = os.path.getsize(args.output) / 1024
+    if size_mb >= 1:
+        print(f"Đã lưu: {args.output} ({size_mb:.2f} MB)")
+    else:
+        print(f"Đã lưu: {args.output} ({size_kb:.1f} KB)")
 
     if not args.no_mongo:
         print("Đang lưu model vào MongoDB (GridFS)...")
